@@ -1,0 +1,13 @@
+{
+  "id": "geolibre-gbif-data",
+  "name": "GBIF Data",
+  "version": "1.0.0",
+  "description": "Fetch georeferenced GBIF occurrence records by map view, layer extent, country or worldwide, with backbone taxon search, major groups, record type, year, photo, IUCN and uncertainty filters, a live match counter, density tiles and a record popup.",
+  "author": "Defani Arman Alfitriansyah",
+  "homepage": "https://github.com/Defani/GBIF-Data",
+  "manifestUrl": "plugins/geolibre-gbif-data/plugin.json",
+  "categories": [
+    "Data"
+  ],
+  "minGeoLibreVersion": "3.0.0"
+}

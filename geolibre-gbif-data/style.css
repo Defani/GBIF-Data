@@ -1,0 +1,1140 @@
+/* SPDX-License-Identifier: MIT
+   Copyright (c) 2026 Defani Arman Alfitriansyah */
+
+/* Scoped to .geolibre-gbif-* so nothing leaks into the app. Built only from
+   GeoLibre's own tokens (hsl(var(--foreground)), --border, --muted ...) so
+   the panel looks like the host's own panels and follows light/dark. The
+   one accent is the same green the iNaturalist Extractor plugin uses. Text
+   wraps instead of being cut off with an ellipsis. */
+
+/* ---------- Toolbar button ---------- */
+
+/* Same look as GeoLibre's own map buttons in both themes: the host paints the
+   control group with --popover, and the leaf is drawn in currentColor with
+   the host's --popover-foreground, so it is black in light mode and white in
+   dark mode. */
+.geolibre-gbif-control button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: hsl(var(--popover-foreground, var(--foreground)));
+  cursor: pointer;
+}
+
+.geolibre-gbif-control button:hover {
+  background: hsl(var(--accent, var(--muted)));
+}
+
+.geolibre-gbif-control button:focus-visible {
+  outline: 2px solid hsl(var(--ring, var(--foreground)));
+  outline-offset: -2px;
+}
+
+/* The rail icon is an <img> (black leaf), so currentColor can't reach it;
+   GeoLibre marks dark mode with html.dark, where it is inverted to white -
+   the same trick the host uses for MapLibre's own icons. The selector finds
+   the icon by the id written into its SVG. */
+html.dark img[src*="geolibre-gbif-data-icon"] {
+  filter: invert(1);
+}
+
+/* ---------- Panel shell ---------- */
+
+.geolibre-gbif-panel {
+  /* Same accent as the iNaturalist Extractor plugin, so the two read as a set.
+     The soft tint is mixed into the host's real background (never guessed
+     from prefers-color-scheme), so it lands right in both themes. */
+  --gbif-on: #2e7d32;
+  --gbif-on-hover: #26692a;
+  --gbif-on-fg: #ffffff;
+  --gbif-on-soft: color-mix(in srgb, var(--gbif-on) 16%, hsl(var(--background)));
+  --gbif-line: hsl(var(--border));
+  --gbif-soft: hsl(var(--muted));
+  --gbif-dim: hsl(var(--foreground) / 0.6);
+  --gbif-radius: 6px;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+.geolibre-gbif-panel *,
+.geolibre-gbif-panel *::before,
+.geolibre-gbif-panel *::after {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.geolibre-gbif-panel button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.geolibre-gbif-panel button:focus-visible,
+.geolibre-gbif-panel input:focus-visible,
+.geolibre-gbif-panel select:focus-visible {
+  outline: 2px solid hsl(var(--foreground) / 0.5);
+  outline-offset: 1px;
+}
+
+/* ---------- Header + counter ---------- */
+
+.geolibre-gbif-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gbif-line);
+}
+
+.geolibre-gbif-head-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.geolibre-gbif-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.geolibre-gbif-subtitle {
+  font-size: 12px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-reset {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: transparent;
+  color: inherit;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.geolibre-gbif-reset:hover {
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-counter {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 12px 2px;
+  padding: 8px 12px;
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-counter-num {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.15s;
+}
+
+.geolibre-gbif-counter-label {
+  font-size: 12px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-counter[data-state="loading"] .geolibre-gbif-counter-num {
+  opacity: 0.35;
+}
+
+/* ---------- Steps ---------- */
+
+.geolibre-gbif-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.geolibre-gbif-step {
+  border-bottom: 1px solid var(--gbif-line);
+}
+
+.geolibre-gbif-step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+}
+
+.geolibre-gbif-step-head:hover {
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-step-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--gbif-line);
+  border-radius: 50%;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-step-head svg {
+  display: none;
+}
+
+.geolibre-gbif-step-label {
+  font-weight: 600;
+}
+
+.geolibre-gbif-step-value {
+  margin-inline-start: auto;
+  max-width: 55%;
+  text-align: end;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-step-value.is-set {
+  color: var(--gbif-on);
+  font-weight: 700;
+}
+
+.geolibre-gbif-step-value.is-set ~ .geolibre-gbif-step-chev {
+  margin-inline-start: 0;
+}
+
+.geolibre-gbif-step:has(.geolibre-gbif-step-value.is-set) .geolibre-gbif-step-no {
+  border-color: var(--gbif-on);
+  background: var(--gbif-on);
+  color: var(--gbif-on-fg);
+}
+
+.geolibre-gbif-step-chev {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: 2px;
+  border-inline-end: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0.5;
+  transition: transform 0.15s;
+}
+
+.geolibre-gbif-step[data-open="true"] .geolibre-gbif-step-chev {
+  transform: rotate(45deg);
+}
+
+.geolibre-gbif-step-body {
+  padding: 0 12px 14px 32px;
+}
+
+/* ---------- Fields ---------- */
+
+.geolibre-gbif-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.geolibre-gbif-field[hidden],
+.geolibre-gbif-note[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-step-body > .geolibre-gbif-field:first-child {
+  margin-top: 0;
+}
+
+.geolibre-gbif-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.geolibre-gbif-mt {
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.geolibre-gbif-help {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-note {
+  padding: 6px 8px;
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font: inherit;
+}
+
+.geolibre-gbif-input:focus {
+  border-color: hsl(var(--foreground) / 0.55);
+  outline: none;
+}
+
+.geolibre-gbif-input:disabled {
+  opacity: 0.45;
+}
+
+/* ---------- Segmented control ---------- */
+
+.geolibre-gbif-seg {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-seg-btn {
+  flex: 1;
+  min-height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: calc(var(--gbif-radius) - 2px);
+  background: transparent;
+  color: var(--gbif-dim);
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.2;
+}
+
+.geolibre-gbif-seg-btn:hover {
+  color: hsl(var(--foreground));
+}
+
+.geolibre-gbif-seg-btn[aria-checked="true"] {
+  background: var(--gbif-on);
+  color: var(--gbif-on-fg);
+}
+
+/* ---------- Taxon search ---------- */
+
+.geolibre-gbif-search {
+  position: relative;
+}
+
+.geolibre-gbif-suggest {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 2px);
+  z-index: 10;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: hsl(var(--background));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+}
+
+.geolibre-gbif-suggest[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-suggest-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: calc(var(--gbif-radius) - 2px);
+  cursor: pointer;
+}
+
+.geolibre-gbif-suggest-item.is-active,
+.geolibre-gbif-suggest-item:hover {
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-suggest-name {
+  font-weight: 600;
+  font-style: italic;
+}
+
+.geolibre-gbif-suggest-meta {
+  font-size: 11px;
+  color: var(--gbif-dim);
+  text-transform: capitalize;
+}
+
+.geolibre-gbif-suggest-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.geolibre-gbif-tokens[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  max-width: 100%;
+  padding-inline: 8px 2px;
+  border: 1px solid var(--gbif-on);
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-on-soft);
+}
+
+.geolibre-gbif-token-rank {
+  color: var(--gbif-on);
+}
+
+.geolibre-gbif-token-rank {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.geolibre-gbif-token-name {
+  font-weight: 600;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.geolibre-gbif-token-x {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: calc(var(--gbif-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font-size: 15px !important;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.geolibre-gbif-token-x:hover {
+  opacity: 1;
+  background: hsl(var(--border));
+}
+
+/* ---------- Toggle tiles ---------- */
+
+.geolibre-gbif-tiles {
+  display: grid;
+  gap: 4px;
+}
+
+.geolibre-gbif-tiles-3 {
+  /* Three columns when the panel is wide enough for the longest name
+     (Actinopterygii), two when it isn't - names never break mid-word. */
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+
+.geolibre-gbif-tiles-2 {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.geolibre-gbif-tile {
+  min-height: 28px;
+  padding: 4px 8px;
+  line-height: 1.25;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: hsl(var(--background));
+  color: inherit;
+  font-size: 12px !important;
+  text-align: start;
+  overflow-wrap: break-word;
+}
+
+.geolibre-gbif-tile:hover {
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-tile[aria-pressed="true"] {
+  border-color: var(--gbif-on);
+  background: var(--gbif-on-soft);
+  font-weight: 600;
+}
+
+/* ---------- Time ---------- */
+
+.geolibre-gbif-year-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.geolibre-gbif-year-row.is-off {
+  opacity: 0.5;
+}
+
+.geolibre-gbif-year {
+  font-variant-numeric: tabular-nums;
+}
+
+.geolibre-gbif-year-sep {
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.geolibre-gbif-preset {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--gbif-line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 11.5px !important;
+}
+
+.geolibre-gbif-preset:hover {
+  background: var(--gbif-soft);
+}
+
+/* ---------- Switches ---------- */
+
+.geolibre-gbif-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.geolibre-gbif-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.geolibre-gbif-switch-track {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: hsl(var(--foreground) / 0.22);
+  transition: background 0.15s;
+}
+
+.geolibre-gbif-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: hsl(var(--background));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+
+.geolibre-gbif-switch input:checked + .geolibre-gbif-switch-track {
+  background: var(--gbif-on);
+}
+
+.geolibre-gbif-switch input:checked + .geolibre-gbif-switch-track::after {
+  transform: translateX(14px);
+}
+
+[dir="rtl"] .geolibre-gbif-switch input:checked + .geolibre-gbif-switch-track::after {
+  transform: translateX(-14px);
+}
+
+.geolibre-gbif-switch input:focus-visible + .geolibre-gbif-switch-track {
+  outline: 2px solid hsl(var(--foreground) / 0.5);
+  outline-offset: 2px;
+}
+
+.geolibre-gbif-switch-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.geolibre-gbif-switch-text strong {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.geolibre-gbif-switch-text small {
+  font-size: 11px;
+  color: var(--gbif-dim);
+}
+
+/* ---------- IUCN ---------- */
+
+.geolibre-gbif-iucn {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+/* Official IUCN Red List category colours. Off: a colour bar under the code;
+   on: the whole button takes the category colour, with black or white text
+   (whichever reads on that colour), as on the IUCN Red List website. */
+.geolibre-gbif-iucn-btn {
+  --cat: #d1d1c6;
+  --cat-fg: #000000;
+  height: 28px;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: transparent;
+  box-shadow: inset 0 -4px 0 var(--cat);
+  color: inherit;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+}
+
+.geolibre-gbif-iucn-btn[data-cat="CR"] { --cat: #d81e05; --cat-fg: #ffffff; }
+.geolibre-gbif-iucn-btn[data-cat="EN"] { --cat: #fc7f3f; }
+.geolibre-gbif-iucn-btn[data-cat="VU"] { --cat: #f9e814; }
+.geolibre-gbif-iucn-btn[data-cat="NT"] { --cat: #cce226; }
+.geolibre-gbif-iucn-btn[data-cat="LC"] { --cat: #60c659; }
+.geolibre-gbif-iucn-btn[data-cat="DD"] { --cat: #d1d1c6; }
+
+.geolibre-gbif-iucn-btn:hover {
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-iucn-btn[aria-pressed="true"] {
+  border-color: var(--cat);
+  background: var(--cat);
+  box-shadow: none;
+  color: var(--cat-fg);
+}
+
+/* ---------- Footer ---------- */
+
+.geolibre-gbif-foot {
+  padding: 12px;
+}
+
+.geolibre-gbif-actions {
+  flex: none;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--gbif-line);
+  background: hsl(var(--background));
+}
+
+.geolibre-gbif-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.geolibre-gbif-tags[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-soft);
+  font-size: 11px;
+}
+
+.geolibre-gbif-tag-text {
+  padding: 0 2px 0 7px;
+  overflow-wrap: anywhere;
+}
+
+.geolibre-gbif-tag button {
+  width: 18px;
+  height: 18px;
+  margin-inline-end: 1px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px !important;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.geolibre-gbif-tag button:hover {
+  opacity: 1;
+  background: var(--gbif-line);
+}
+
+.geolibre-gbif-out {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.geolibre-gbif-limit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.geolibre-gbif-max {
+  width: 84px;
+  height: 28px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drawn by hand instead of the browser's native slider, whose track stays
+   light-grey in a dark app. The track uses the host's border token and the
+   part left of the thumb (--fill, set from index.js) the accent. */
+.geolibre-gbif-range {
+  --fill: 0%;
+  width: 100%;
+  height: 18px;
+  margin: 4px 0 6px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.geolibre-gbif-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--gbif-on) 0 var(--fill),
+    hsl(var(--border)) var(--fill) 100%
+  );
+}
+
+.geolibre-gbif-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: hsl(var(--border));
+}
+
+.geolibre-gbif-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--gbif-on);
+}
+
+.geolibre-gbif-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 2px solid var(--gbif-on);
+  border-radius: 50%;
+  background: hsl(var(--background));
+}
+
+.geolibre-gbif-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--gbif-on);
+  border-radius: 50%;
+  background: hsl(var(--background));
+}
+
+.geolibre-gbif-range:focus-visible {
+  outline: none;
+}
+
+.geolibre-gbif-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--gbif-on-soft);
+}
+
+.geolibre-gbif-problem {
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border: 1px solid hsl(var(--foreground) / 0.35);
+  border-inline-start-width: 3px;
+  border-radius: var(--gbif-radius);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.geolibre-gbif-problem[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-progress {
+  position: relative;
+  height: 20px;
+  margin-bottom: 8px;
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-soft);
+  overflow: hidden;
+}
+
+.geolibre-gbif-progress[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-progress-bar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 0;
+  background: var(--gbif-on-soft);
+  border-inline-end: 2px solid var(--gbif-on);
+  transition: width 0.2s;
+}
+
+.geolibre-gbif-progress-text {
+  position: relative;
+  display: block;
+  line-height: 20px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.geolibre-gbif-results {
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--gbif-line);
+  border-radius: var(--gbif-radius);
+}
+
+.geolibre-gbif-results[hidden] {
+  display: none;
+}
+
+.geolibre-gbif-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 4px;
+}
+
+.geolibre-gbif-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  border-radius: calc(var(--gbif-radius) - 2px);
+  background: var(--gbif-soft);
+}
+
+.geolibre-gbif-stat strong {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.geolibre-gbif-stat span {
+  font-size: 11px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-top {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.geolibre-gbif-top li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.geolibre-gbif-top-bar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: 3px;
+  background: var(--gbif-on-soft);
+}
+
+.geolibre-gbif-top-name {
+  position: relative;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.geolibre-gbif-top-n {
+  position: relative;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.geolibre-gbif-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-radius: var(--gbif-radius);
+  background: var(--gbif-on);
+  color: var(--gbif-on-fg);
+  font-weight: 700 !important;
+}
+
+.geolibre-gbif-go:hover {
+  background: var(--gbif-on-hover);
+}
+
+.geolibre-gbif-go-icon {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-block: 5px solid transparent;
+  border-inline-start: 8px solid currentColor;
+}
+
+[dir="rtl"] .geolibre-gbif-go-icon[data-kind="play"] {
+  transform: scaleX(-1);
+}
+
+.geolibre-gbif-go-icon[data-kind="stop"] {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  background: currentColor;
+}
+
+.geolibre-gbif-go.is-busy {
+  border: 1px solid var(--gbif-line);
+  background: transparent;
+  color: hsl(var(--foreground));
+}
+
+.geolibre-gbif-credit {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--gbif-dim);
+}
+
+.geolibre-gbif-credit a {
+  color: inherit;
+}
+
+/* ---------- Map popup ---------- */
+
+.geolibre-gbif-popup {
+  position: absolute;
+  z-index: 5;
+  transform: translate(-50%, calc(-100% - 14px));
+  width: 250px;
+  max-width: 75vw;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: auto;
+}
+
+.geolibre-gbif-popup.is-below {
+  transform: translate(-50%, 14px);
+}
+
+.geolibre-gbif-popup::after {
+  content: "";
+  position: absolute;
+  left: var(--arrow-x, 50%);
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.geolibre-gbif-popup.is-below::after {
+  top: -7px;
+  bottom: auto;
+  border: 0;
+  border-left: 1px solid hsl(var(--border));
+  border-top: 1px solid hsl(var(--border));
+}
+
+.geolibre-gbif-popup-head {
+  position: relative;
+  padding: 9px 34px 8px 10px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.geolibre-gbif-popup-kicker {
+  font-size: 10.5px;
+  color: hsl(var(--foreground) / 0.6);
+}
+
+.geolibre-gbif-popup-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.geolibre-gbif-popup-common {
+  font-size: 11.5px;
+  color: hsl(var(--foreground) / 0.7);
+}
+
+.geolibre-gbif-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.geolibre-gbif-popup-close:hover {
+  opacity: 1;
+  background: hsl(var(--muted));
+}
+
+.geolibre-gbif-popup-photo {
+  display: block;
+  cursor: zoom-in;
+}
+
+.geolibre-gbif-popup-photo img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+
+.geolibre-gbif-popup-attr {
+  padding: 2px 10px 0;
+  font-size: 10px;
+  color: hsl(var(--foreground) / 0.6);
+}
+
+.geolibre-gbif-popup-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.geolibre-gbif-popup-rows dt {
+  color: hsl(var(--foreground) / 0.6);
+}
+
+.geolibre-gbif-popup-rows dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.geolibre-gbif-iucn-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #d1d1c6;
+  color: #000;
+  font-weight: 700;
+}
+
+.geolibre-gbif-iucn-badge[data-cat="EX"] { background: #000000; color: #fff; }
+.geolibre-gbif-iucn-badge[data-cat="EW"] { background: #542344; color: #fff; }
+.geolibre-gbif-iucn-badge[data-cat="CR"] { background: #d81e05; color: #fff; }
+.geolibre-gbif-iucn-badge[data-cat="EN"] { background: #fc7f3f; }
+.geolibre-gbif-iucn-badge[data-cat="VU"] { background: #f9e814; }
+.geolibre-gbif-iucn-badge[data-cat="NT"] { background: #cce226; }
+.geolibre-gbif-iucn-badge[data-cat="LC"] { background: #60c659; }
+.geolibre-gbif-iucn-badge[data-cat="NE"] { background: #ffffff; border: 1px solid #ccc; }
+
+.geolibre-gbif-popup-link {
+  display: block;
+  margin: 0 10px 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #2e7d32;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+}
+
+.geolibre-gbif-popup-link:hover {
+  background: #26692a;
+}
