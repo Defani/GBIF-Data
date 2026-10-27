@@ -19,6 +19,13 @@
 //    coordinate uncertainty, geospatial-issue and "present only" switches,
 //    recorded by, dataset key, institution code and full-text search.
 //  - A live "N records match" counter (limit=0 requests) in the header.
+//  - Licence filter and a "Cite this data" card (citation text, dataset list
+//    with record counts for a GBIF derived dataset DOI, link to the same
+//    search on GBIF.org), following the GBIF data user agreement and citation
+//    guidelines (https://www.gbif.org/terms/data-user).
+//
+// An independent community plugin: not made, affiliated with or endorsed by
+// GBIF. The data belong to their publishers.
 //
 // This is a self-contained ES module: no bare `import`s, everything the
 // plugin needs is written inline below (per the GeoLibre plugin contract,
@@ -27,7 +34,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const PLUGIN_ID = "geolibre-gbif-data";
-const PLUGIN_VERSION = "1.0.0";
+const PLUGIN_VERSION = "1.1.0";
 const PANEL_ID = `${PLUGIN_ID}-panel`;
 const PLUGIN_TITLE = "GBIF Data";
 
@@ -40,12 +47,21 @@ const SEARCH_URL = `${API_ROOT}/v1/occurrence/search`;
 const SUGGEST_URL = `${API_ROOT}/v1/species/suggest`;
 const MATCH_URL = `${API_ROOT}/v1/species/match`;
 const ADHOC_TILE_URL = `${API_ROOT}/v2/map/occurrence/adhoc/{z}/{x}/{y}@1x.png`;
+const SITE_ROOT = "https://www.gbif.org";
+const SITE_SEARCH_URL = `${SITE_ROOT}/occurrence/search`;
+const DERIVED_DATASET_URL = `${SITE_ROOT}/derived-dataset/register`;
+const CITATION_GUIDE_URL = `${SITE_ROOT}/citation-guidelines`;
+const DATA_USER_TERMS_URL = `${SITE_ROOT}/terms/data-user`;
 
 const PER_PAGE_LIMIT = 300; // GBIF's own per-request ceiling
 const DEFAULT_MAX_RECORDS = 500;
 const MAX_ALLOWED_RECORDS = 5000; // keep the plugin polite to the public API
 const PAGE_DELAY_MS = 200;
 const REQUEST_TIMEOUT_MS = 30000;
+// GBIF answers 429 when it is busy; back off and retry a few times rather
+// than keep hammering it (the data user agreement forbids disrupting the API).
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
 
 // One-click groups. Keys are GBIF backbone taxon keys, sent as taxonKey
 // (several taxonKey values are OR-ed by the API).
@@ -83,6 +99,13 @@ const IUCN_CATEGORIES = [
   { value: "NT", label: "NT", title: "Near threatened" },
   { value: "LC", label: "LC", title: "Least concern" },
   { value: "DD", label: "DD", title: "Data deficient" },
+];
+
+// The three licences GBIF allows for occurrence data (values of `license`).
+const LICENSES = [
+  { value: "CC0_1_0", label: "CC0", title: "Public domain dedication - no conditions" },
+  { value: "CC_BY_4_0", label: "CC BY", title: "Attribution required" },
+  { value: "CC_BY_NC_4_0", label: "CC BY-NC", title: "Attribution required, no commercial use" },
 ];
 
 const UNCERTAINTY_CHOICES = [
@@ -310,6 +333,61 @@ function thumbnailUrl(url) {
   return safe;
 }
 
+// GBIF returns a licence as a Creative Commons URL (record) or an enum such
+// as CC_BY_4_0 (filter); both become a short label.
+function licenseLabel(value) {
+  if (!value) return null;
+  const s = String(value).toLowerCase();
+  if (/publicdomain\/zero|cc0/.test(s)) return "CC0";
+  if (/by[-_]nc/.test(s)) return "CC BY-NC";
+  if (/licenses\/by\/|cc_by_4_0|^cc[- ]by$/.test(s)) return "CC BY";
+  return String(value);
+}
+
+function isoDate(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function longDate(date = new Date()) {
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Clipboard API refused (no permission / insecure context): fall back to
+    // a temporary selection.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+}
+
+function saveTextFile(name, text, type = "text/csv") {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ############################################################################
 // ########## Requests #######################################################
 // ############################################################################
@@ -333,6 +411,7 @@ function buildFilterParams(f) {
   for (const key of f.taxonKeys) params.append("taxonKey", String(key));
   for (const basis of f.basis) params.append("basisOfRecord", basis);
   for (const cat of f.iucn) params.append("iucnRedListCategory", cat);
+  for (const lic of f.licenses) params.append("license", lic);
 
   if (f.yearFrom || f.yearTo) {
     const from = f.yearFrom || "*";
@@ -365,9 +444,46 @@ function densityTileUrl(filters) {
   return `${ADHOC_TILE_URL}?${params.toString()}`;
 }
 
+// The same search on GBIF.org, where the person can make a download with its
+// own DOI. The website takes the API's parameters in snake_case, and an area
+// as a WKT polygon.
+function siteSearchUrl(filters) {
+  const api = buildFilterParams({ ...filters, bounds: null });
+  const params = new URLSearchParams();
+  for (const [key, value] of api) {
+    params.append(key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), value);
+  }
+  if (filters.bounds) {
+    const { lat, lng } = boundsToRanges(filters.bounds);
+    const [s, n] = lat.split(",");
+    const [w, e] = lng ? lng.split(",") : ["-180", "180"];
+    params.set("geometry", `POLYGON((${w} ${s},${e} ${s},${e} ${n},${w} ${n},${w} ${s}))`);
+  }
+  return `${SITE_SEARCH_URL}?${params.toString()}`;
+}
+
+function retryDelayMs(response, attempt) {
+  const header = Number(response.headers.get("Retry-After"));
+  if (Number.isFinite(header) && header > 0) return Math.min(header, 60) * 1000;
+  return RETRY_BASE_MS * 2 ** attempt;
+}
+
 // One GBIF request with a hard time limit. A timeout becomes a visible error;
-// an abort from the panel (Cancel, plugin closed) stays an AbortError.
+// an abort from the panel (Cancel, plugin closed) stays an AbortError. A 429
+// or 503 is retried after the delay GBIF asks for (or an exponential one).
 async function fetchJsonWithTimeout(url, outerSignal, timeoutMs = REQUEST_TIMEOUT_MS) {
+  for (let attempt = 0; ; attempt += 1) {
+    const result = await fetchJsonOnce(url, outerSignal, timeoutMs);
+    if (!result.retry || attempt >= MAX_RETRIES) {
+      if (result.retry) throw new Error("GBIF is busy (too many requests) - wait a minute and try again.");
+      return result.data;
+    }
+    await sleep(retryDelayMs(result.response, attempt));
+    if (outerSignal?.aborted) throw new DOMException("Aborted", "AbortError");
+  }
+}
+
+async function fetchJsonOnce(url, outerSignal, timeoutMs) {
   const controller = new AbortController();
   let timedOut = false;
   const onOuterAbort = () => controller.abort();
@@ -384,6 +500,9 @@ async function fetchJsonWithTimeout(url, outerSignal, timeoutMs = REQUEST_TIMEOU
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
+    if (response.status === 429 || response.status === 503) {
+      return { retry: true, response };
+    }
     if (!response.ok) {
       let detail = "";
       try {
@@ -393,7 +512,7 @@ async function fetchJsonWithTimeout(url, outerSignal, timeoutMs = REQUEST_TIMEOU
       }
       throw new Error(`GBIF API responded with ${response.status}${detail ? `: ${detail}` : ""}`);
     }
-    return await response.json();
+    return { retry: false, data: await response.json() };
   } catch (error) {
     if (timedOut) {
       throw new Error(`GBIF did not answer within ${Math.round(timeoutMs / 1000)} s - try again in a moment.`);
@@ -407,7 +526,10 @@ async function fetchJsonWithTimeout(url, outerSignal, timeoutMs = REQUEST_TIMEOU
 
 // Maps one GBIF occurrence to a flat GeoJSON Feature (every value a scalar, so
 // the attribute table and exports show one column per field).
-function occurrenceToFeature(rec) {
+// `accessedOn` (YYYY-MM-DD) goes on every record: citations of GBIF data
+// state the access date. Dataset key, publisher and licence stay on each
+// record too, as the data user agreement asks for data shared onward.
+function occurrenceToFeature(rec, accessedOn) {
   const lat = rec.decimalLatitude;
   const lng = rec.decimalLongitude;
   if (typeof lat !== "number" || typeof lng !== "number") return null;
@@ -449,14 +571,19 @@ function occurrenceToFeature(rec) {
       occurrenceStatus: rec.occurrenceStatus || null,
       datasetName: rec.datasetName || null,
       datasetKey: rec.datasetKey || null,
+      datasetUrl: rec.datasetKey ? `${SITE_ROOT}/dataset/${rec.datasetKey}` : null,
       institutionCode: rec.institutionCode || null,
       publisher: rec.publishingOrgKey || null,
+      rightsHolder: rec.rightsHolder || null,
+      occurrenceID: rec.occurrenceID || null,
       license: rec.license || null,
+      licenseLabel: licenseLabel(rec.license),
       imageCount: images.length,
       image: image ? image.identifier : null,
       imageCreator: image ? image.rightsHolder || image.creator || null : null,
       imageLicense: image ? image.license || null : null,
-      gbifUrl: `https://www.gbif.org/occurrence/${rec.key}`,
+      gbifUrl: `${SITE_ROOT}/occurrence/${rec.key}`,
+      accessed: accessedOn,
     },
   };
 }
@@ -992,6 +1119,28 @@ function renderPanel(container) {
   }
   qualityPanel.appendChild(iucnRow);
 
+  qualityPanel.appendChild(el("span", "geolibre-gbif-field-label geolibre-gbif-mt", "Data licence"));
+  const selectedLicenses = new Set();
+  const licenseGrid = el("div", "geolibre-gbif-tiles geolibre-gbif-tiles-3");
+  const licenseButtons = new Map();
+  for (const l of LICENSES) {
+    const tile = button("geolibre-gbif-tile", l.label);
+    tile.title = l.title;
+    tile.setAttribute("aria-pressed", "false");
+    tile.addEventListener("click", () => {
+      if (selectedLicenses.has(l.value)) selectedLicenses.delete(l.value);
+      else selectedLicenses.add(l.value);
+      tile.setAttribute("aria-pressed", String(selectedLicenses.has(l.value)));
+      refreshAll();
+    });
+    licenseButtons.set(l.value, tile);
+    licenseGrid.appendChild(tile);
+  }
+  qualityPanel.appendChild(licenseGrid);
+  qualityPanel.appendChild(
+    el("p", "geolibre-gbif-help", "None selected means every licence. Leave out CC BY-NC for commercial work."),
+  );
+
   for (const input of [photosOnlyInput, noIssuesInput, presentOnlyInput]) {
     input.addEventListener("change", refreshAll);
   }
@@ -1101,13 +1250,26 @@ function renderPanel(container) {
   actions.appendChild(go);
 
   const credit = el("p", "geolibre-gbif-credit");
-  credit.appendChild(document.createTextNode("Data: GBIF.org · "));
+  credit.appendChild(document.createTextNode("Data: GBIF.org and its publishers · "));
   const citeLink = el("a", null, "cite the datasets you use");
-  citeLink.href = "https://www.gbif.org/citation-guidelines";
+  citeLink.href = CITATION_GUIDE_URL;
   citeLink.target = "_blank";
   citeLink.rel = "noopener";
   credit.appendChild(citeLink);
   actions.appendChild(credit);
+
+  // GBIF neither makes this plugin nor guarantees the data it serves.
+  const disclaimer = el("p", "geolibre-gbif-disclaimer");
+  disclaimer.appendChild(
+    document.createTextNode("Independent plugin, not affiliated with GBIF. Data quality is not guaranteed; see the "),
+  );
+  const termsLink = el("a", null, "data user agreement");
+  termsLink.href = DATA_USER_TERMS_URL;
+  termsLink.target = "_blank";
+  termsLink.rel = "noopener";
+  disclaimer.appendChild(termsLink);
+  disclaimer.appendChild(document.createTextNode("."));
+  actions.appendChild(disclaimer);
 
   // ---- Reading the form ------------------------------------------------------
   function currentMax() {
@@ -1129,6 +1291,7 @@ function renderPanel(container) {
       taxonKeys: [...selectedTaxa.keys(), ...selectedGroups],
       basis: [...selectedBasis],
       iucn: [...selectedIucn],
+      licenses: [...selectedLicenses],
       yearFrom: null,
       yearTo: null,
       photosOnly: photosOnlyInput.checked,
@@ -1195,6 +1358,9 @@ function renderPanel(container) {
     for (const c of selectedIucn) {
       tags.push([`IUCN ${c}`, () => { selectedIucn.delete(c); iucnButtons.get(c)?.setAttribute("aria-pressed", "false"); }]);
     }
+    for (const value of selectedLicenses) {
+      tags.push([licenseLabel(value), () => { selectedLicenses.delete(value); licenseButtons.get(value)?.setAttribute("aria-pressed", "false"); }]);
+    }
     if (uncertaintySelect.value) {
       tags.push([uncertaintySelect.options[uncertaintySelect.selectedIndex].text, () => { uncertaintySelect.value = ""; }]);
     }
@@ -1239,7 +1405,12 @@ function renderPanel(container) {
     setStepValue("basis", selectedBasis.size ? `${selectedBasis.size} type${selectedBasis.size === 1 ? "" : "s"}` : "All", selectedBasis.size > 0);
     const ranged = timeSeg.get() === "range";
     setStepValue("time", ranged ? `${yearFromInput.value || "…"}–${yearToInput.value || "…"}` : "All years", ranged);
-    const q = [photosOnlyInput.checked && "Photo", selectedIucn.size && `IUCN×${selectedIucn.size}`, uncertaintySelect.value && "Precise"].filter(Boolean);
+    const q = [
+      photosOnlyInput.checked && "Photo",
+      selectedIucn.size && `IUCN×${selectedIucn.size}`,
+      uncertaintySelect.value && "Precise",
+      selectedLicenses.size && "Licence",
+    ].filter(Boolean);
     setStepValue("quality", q.join(" + "), q.length > 0);
     const more = [recordedByInput, datasetInput, institutionInput, qInput].filter((i) => i.value.trim()).length;
     setStepValue("more", more ? `${more} set` : "", more > 0);
@@ -1314,7 +1485,104 @@ function renderPanel(container) {
   state.map?.on?.("moveend", onMoveEnd);
 
   // ---- Results card ------------------------------------------------------------
-  function showResults({ added, withPhoto, speciesCount, available, topSpecies, densityAdded, layerName }) {
+  function link(text, href) {
+    const a = el("a", null, text);
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    return a;
+  }
+
+  // The GBIF data user agreement asks users to cite the publishers of the data
+  // they use, ideally with a DOI. Records fetched through the search API have
+  // no DOI of their own, so GBIF's guidance is to register a derived dataset
+  // (dataset keys + record counts) or to make a download of the same search.
+  function renderCitation(filters, features, accessedOn) {
+    const box = el("div", "geolibre-gbif-cite");
+    box.appendChild(el("span", "geolibre-gbif-field-label", "Cite this data"));
+    const searchHref = siteSearchUrl(filters);
+
+    if (!features) {
+      box.appendChild(
+        el("p", "geolibre-gbif-help", "When you use this map, cite a GBIF.org download of the same search: it gets its own DOI."),
+      );
+      const links = el("div", "geolibre-gbif-cite-links");
+      links.appendChild(link("Open this search on GBIF.org ↗", searchHref));
+      box.appendChild(links);
+      return box;
+    }
+
+    const licences = new Map();
+    const datasets = new Map(); // key -> { name, count }
+    for (const f of features) {
+      const p = f.properties;
+      const lic = p.licenseLabel || "Unknown licence";
+      licences.set(lic, (licences.get(lic) || 0) + 1);
+      if (p.datasetKey) {
+        const d = datasets.get(p.datasetKey) || { name: p.datasetName || p.institutionCode || "", count: 0 };
+        d.count += 1;
+        datasets.set(p.datasetKey, d);
+      }
+    }
+    const datasetRows = [...datasets.entries()].sort((a, b) => b[1].count - a[1].count);
+
+    const licRow = el("div", "geolibre-gbif-lic");
+    for (const [name, n] of [...licences.entries()].sort((a, b) => b[1] - a[1])) {
+      const chip = el("span", null, `${name} · ${formatCount(n)}`);
+      chip.dataset.nc = String(name === "CC BY-NC");
+      licRow.appendChild(chip);
+    }
+    box.appendChild(licRow);
+    const nc = licences.get("CC BY-NC") || 0;
+    if (nc) {
+      box.appendChild(
+        el("p", "geolibre-gbif-help", `${formatCount(nc)} records are CC BY-NC: not for commercial use. Filter by Data licence to leave them out.`),
+      );
+    }
+    box.appendChild(
+      el(
+        "p",
+        "geolibre-gbif-help",
+        `${formatCount(features.length)} records from ${formatCount(datasetRows.length)} datasets. GBIF asks you to cite them with a DOI: register a derived dataset with the dataset list, or download this search on GBIF.org.`,
+      ),
+    );
+
+    const queryUrl = `${SEARCH_URL}?${buildFilterParams(filters).toString()}`;
+    const citation = [
+      `GBIF.org (${longDate()}) GBIF Occurrence Data, ${formatCount(features.length)} records accessed via the GBIF occurrence search API: ${queryUrl}`,
+      "",
+      `Source datasets (datasetKey, records, title), ${datasetRows.length} in all:`,
+      ...datasetRows.map(([key, d]) => `${key}\t${d.count}\t${d.name}`),
+      "",
+      `Register these as a derived dataset to get a DOI to cite: ${DERIVED_DATASET_URL}`,
+    ].join("\n");
+    // Two columns, no header: the layout GBIF's derived-dataset form takes.
+    const csv = datasetRows.map(([key, d]) => `${key},${d.count}`).join("\n") + "\n";
+
+    const actionsRow = el("div", "geolibre-gbif-cite-actions");
+    const copyBtn = button("geolibre-gbif-preset", "Copy citation");
+    copyBtn.addEventListener("click", async () => {
+      const ok = await copyText(citation);
+      copyBtn.textContent = ok ? "Copied ✓" : "Copy failed";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy citation";
+      }, 1800);
+    });
+    const csvBtn = button("geolibre-gbif-preset", "Save dataset list (CSV)");
+    csvBtn.title = "datasetKey,count per line - upload it when registering a derived dataset";
+    csvBtn.addEventListener("click", () => saveTextFile(`gbif-datasets-${accessedOn}.csv`, csv));
+    actionsRow.append(copyBtn, csvBtn);
+    box.appendChild(actionsRow);
+
+    const links = el("div", "geolibre-gbif-cite-links");
+    links.appendChild(link("Register a derived dataset (DOI) ↗", DERIVED_DATASET_URL));
+    links.appendChild(link("Open this search on GBIF.org ↗", searchHref));
+    links.appendChild(link("GBIF citation guidelines ↗", CITATION_GUIDE_URL));
+    box.appendChild(links);
+    return box;
+  }
+
+  function showResults({ added, withPhoto, speciesCount, available, topSpecies, densityAdded, layerName, citation }) {
     results.replaceChildren();
     results.hidden = false;
     const grid = el("div", "geolibre-gbif-stats");
@@ -1352,6 +1620,7 @@ function renderPanel(container) {
       notes.push(`${formatCount(available - added)} more records match - raise Max records or narrow the filters.`);
     }
     for (const n of notes) results.appendChild(el("p", "geolibre-gbif-help", n));
+    if (citation) results.appendChild(renderCitation(citation.filters, citation.features, citation.accessedOn));
     results.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
@@ -1397,13 +1666,28 @@ function renderPanel(container) {
         attribution: '<a href="https://www.gbif.org" target="_blank" rel="noopener">GBIF.org</a>',
         opacity: 0.85,
         maxzoom: 16,
-        metadata: { source: "GBIF occurrence density (adhoc map API)", query: buildFilterParams(filters).toString() },
+        metadata: {
+          source: "GBIF occurrence density (adhoc map API)",
+          query: buildFilterParams(filters).toString(),
+          accessed: isoDate(),
+          citation: `Cite a GBIF.org download of this search: ${siteSearchUrl(filters)}`,
+        },
       });
       densityAdded = true;
     }
 
+    const accessedOn = isoDate();
     if (out === "density") {
-      showResults({ added: null, withPhoto: 0, speciesCount: 0, available: lastCount, topSpecies: null, densityAdded, layerName: null });
+      showResults({
+        added: null,
+        withPhoto: 0,
+        speciesCount: 0,
+        available: lastCount,
+        topSpecies: null,
+        densityAdded,
+        layerName: null,
+        citation: { filters, features: null, accessedOn },
+      });
       return;
     }
 
@@ -1430,7 +1714,7 @@ function renderPanel(container) {
         await sleep(PAGE_DELAY_MS);
       }
 
-      const features = collected.map(occurrenceToFeature).filter(Boolean);
+      const features = collected.map((rec) => occurrenceToFeature(rec, accessedOn)).filter(Boolean);
       setProgress(null);
       if (features.length === 0) {
         setProblem(problem, "No georeferenced records matched these filters.");
@@ -1461,6 +1745,7 @@ function renderPanel(container) {
         topSpecies,
         densityAdded,
         layerName,
+        citation: { filters, features, accessedOn },
       });
     } catch (err) {
       setProgress(null);
@@ -1499,6 +1784,8 @@ function renderPanel(container) {
     uncertaintySelect.value = "";
     selectedIucn.clear();
     for (const b of iucnButtons.values()) b.setAttribute("aria-pressed", "false");
+    selectedLicenses.clear();
+    for (const b of licenseButtons.values()) b.setAttribute("aria-pressed", "false");
     for (const input of [recordedByInput, datasetInput, institutionInput, qInput]) input.value = "";
     outputSeg.set("points");
     setProblem(problem, "");
@@ -1600,7 +1887,9 @@ function showPopup(map, feature, lngLat) {
     img.addEventListener("error", () => a.remove());
     a.appendChild(img);
     popupEl.appendChild(a);
-    if (p.imageCreator) popupEl.appendChild(el("div", "geolibre-gbif-popup-attr", `© ${p.imageCreator}`));
+    const imageLic = licenseLabel(p.imageLicense);
+    const attr = [p.imageCreator && `© ${p.imageCreator}`, imageLic].filter(Boolean).join(" · ");
+    if (attr) popupEl.appendChild(el("div", "geolibre-gbif-popup-attr", attr));
   }
 
   const dl = el("dl", "geolibre-gbif-popup-rows");
@@ -1611,7 +1900,8 @@ function showPopup(map, feature, lngLat) {
     ["Place", [p.locality, p.stateProvince, p.country].filter(Boolean).join(", ")],
     ["Uncertainty", typeof p.uncertaintyM === "number" ? `${formatCount(p.uncertaintyM)} m` : null],
     ["IUCN", p.iucnRedListCategory],
-    ["Dataset", p.datasetName || p.institutionCode],
+    ["Dataset", p.datasetName || p.institutionCode || (p.datasetKey ? "GBIF dataset" : null)],
+    ["Licence", p.licenseLabel],
   ].filter(([, v]) => v !== null && v !== undefined && v !== "");
   for (const [k, v] of rows) {
     dl.appendChild(el("dt", null, k));
@@ -1623,6 +1913,13 @@ function showPopup(map, feature, lngLat) {
       const cat = IUCN_CATEGORIES.find((c) => c.value === v);
       if (cat) badge.title = cat.title;
       dd.appendChild(badge);
+    } else if (k === "Dataset" && httpUrl(p.datasetUrl)) {
+      // The publisher's dataset page carries its own citation and DOI.
+      const a = el("a", null, String(v));
+      a.href = httpUrl(p.datasetUrl);
+      a.target = "_blank";
+      a.rel = "noopener";
+      dd.appendChild(a);
     } else {
       dd.textContent = String(v);
     }
