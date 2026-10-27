@@ -7,9 +7,7 @@
 
 Fetch georeferenced occurrence records from the
 [Global Biodiversity Information Facility](https://www.gbif.org) straight onto
-the GeoLibre map. A companion to the
-[iNaturalist Extractor](https://github.com/Defani/Geolibre-Inaturalist-Extraction-Plugins)
-plugin, with the same green accent and a simpler step-by-step panel.
+the GeoLibre map. 
 
 > **Independent project.** This is a community plugin, made out of
 > appreciation for GBIF's open data. It is **not** made, affiliated with,
