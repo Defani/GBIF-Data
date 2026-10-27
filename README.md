@@ -7,7 +7,9 @@
 
 Fetch georeferenced occurrence records from the
 [Global Biodiversity Information Facility](https://www.gbif.org) straight onto
-the GeoLibre map. 
+the GeoLibre map. A companion to the
+[iNaturalist Extractor](https://github.com/Defani/Geolibre-Inaturalist-Extraction-Plugins)
+plugin, with the same green accent and a simpler step-by-step panel.
 
 > **Independent project.** This is a community plugin, made out of
 > appreciation for GBIF's open data. It is **not** made, affiliated with,
@@ -27,8 +29,26 @@ the GeoLibre map.
 > mengutip data sesuai pedoman GBIF (daftar dataset untuk DOI *derived
 > dataset*).
 
+## Screenshots
+
+![Birds (Aves) around Bandung fetched as points, with the GBIF Data panel open](docs/screenshots/points.png)
+*1,500 bird records around Bandung, West Java, added as a point layer. The
+header counts every matching record in GBIF (17.3K); the numbered steps hold
+the filters.*
+
+![Record popup with photo, and the results card with the Cite this data section](docs/screenshots/popup-and-citation.png)
+*Clicking a point opens its record: photo with creator and licence, date,
+recorder, family, place, uncertainty, IUCN category, dataset and licence. The
+results card lists the most recorded species, and **Cite this data** shows the
+licence mix (with a CC BY-NC warning) and the citation tools.*
+
+![GBIF hexagon density tiles of all bird records in Indonesia](docs/screenshots/density.png)
+*Density output for Area = Country (Indonesia): GBIF hexagon tiles of all 1.7
+million matching bird records, without downloading them one by one.*
+
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Install](#install)
@@ -264,6 +284,7 @@ GBIF-Data/
 │   ├── index.js                 # self-contained ES module, exports `plugin`
 │   ├── style.css                # panel, popup and control styles (light + dark)
 │   └── LICENSE
+├── docs/screenshots/            # images used in this README
 ├── marketplace/
 │   └── registry-entry.json      # registry/geolibre-gbif-data.json in opengeos/geolibre-plugins
 ├── LICENSE
