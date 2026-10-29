@@ -1,9 +1,11 @@
 {
   "id": "geolibre-gbif-data",
   "name": "GBIF Data",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "entry": "index.js",
   "description": "Fetch georeferenced GBIF occurrence records by map view, layer extent, country or worldwide, with backbone taxon search, major groups, record type, year range, photo, IUCN Red List, coordinate-uncertainty, licence and dataset filters, a live match counter, GBIF density tiles, a record popup and citation tools (dataset list for a derived-dataset DOI). Independent plugin, not affiliated with GBIF.",
   "style": "style.css",
-  "engines": ["maplibre"]
+  "engines": [
+    "maplibre"
+  ]
 }

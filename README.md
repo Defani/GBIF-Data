@@ -1,6 +1,6 @@
 # GBIF Data — GeoLibre plugin
 
-![version](https://img.shields.io/badge/version-1.1.0-2e7d32)
+![version](https://img.shields.io/badge/version-1.1.1-2e7d32)
 ![GeoLibre](https://img.shields.io/badge/GeoLibre-%E2%89%A5%203.0.0-2e7d32)
 ![renderer](https://img.shields.io/badge/renderer-MapLibre-396cb2)
 ![license](https://img.shields.io/badge/license-MIT-blue)
@@ -40,6 +40,12 @@ recorder, family, place, uncertainty, IUCN category, dataset and licence. The
 results card lists the most recorded species, and **Cite this data** shows the
 licence mix (with a CC BY-NC warning) and the citation tools.*
 
+![Threatened species across Java, with the popup of a Critically Endangered record](geolibre-gbif-data/screenshots/threatened.jpg)
+*Quality → IUCN Red List **CR, EN, VU** over Java: 4,003 records of 91 threatened
+species. The popup of *Globba maculata* (Critically Endangered) shows the red IUCN
+badge, the generalised location (31 km uncertainty) and the photo's creator
+and licence.*
+
 ![GBIF hexagon density tiles of all bird records in Indonesia](docs/screenshots/density.png)
 *Density output for Area = Country (Indonesia): GBIF hexagon tiles of all 1.7
 million matching bird records, without downloading them one by one.*
@@ -59,7 +65,9 @@ million matching bird records, without downloading them one by one.*
 - [Troubleshooting](#troubleshooting)
 - [Repository layout](#repository-layout)
 - [Development](#development)
+- [Tech stack](#tech-stack)
 - [Data use and citation](#data-use-and-citation)
+- [References](#references)
 - [Privacy](#privacy)
 - [Changelog](#changelog)
 - [Licence](#licence)
@@ -281,7 +289,10 @@ GBIF-Data/
 │   ├── plugin.json              # manifest: id, version, entry, style, engines
 │   ├── index.js                 # self-contained ES module, exports `plugin`
 │   ├── style.css                # panel, popup and control styles (light + dark)
-│   └── LICENSE
+│   ├── screenshots/             # catalog screenshots (shipped in the release zip)
+│   ├── LICENSE                  # MIT
+│   ├── LICENSE-Apache-2.0.txt   # for the inlined Material Symbols icons
+│   └── THIRD_PARTY_NOTICES.md
 ├── docs/screenshots/            # images used in this README
 ├── marketplace/
 │   └── registry-entry.json      # registry/geolibre-gbif-data.json in opengeos/geolibre-plugins
@@ -311,6 +322,28 @@ npx esbuild geolibre-gbif-data/style.css --minify --outfile=dist/style.css
 
 Issues and pull requests are welcome on
 [GitHub](https://github.com/Defani/GBIF-Data/issues).
+
+## Tech stack
+
+Everything the plugin is built from, runs on, or talks to:
+
+| Layer | What | Licence / spec |
+| --- | --- | --- |
+| Language | JavaScript (ECMAScript 2020 module), one self-contained `index.js`, no imports | — |
+| Styling | Plain CSS, every class prefixed `geolibre-gbif-`, light and dark themes from GeoLibre's CSS variables | — |
+| UI | DOM API only (`createElement`, `textContent`); never `innerHTML` for API data | — |
+| Host | [GeoLibre](https://github.com/opengeos/GeoLibre) ≥ 3.0.0 plugin API (`addMapControl`, `registerRightPanel`, `addGeoJsonLayer`, `addTileLayer`, `getViewBounds`, `getLayerFeatures`, `fitBounds`, `getActiveMapTool`) | MIT |
+| Map engine | [MapLibre GL JS](https://maplibre.org), provided by GeoLibre (`app.getMap()`); not bundled | BSD-3-Clause |
+| Data | [GBIF API v1](https://techdocs.gbif.org/en/openapi/): `occurrence/search`, `species/suggest`, `species/match` | GBIF terms of use, data user agreement |
+| Tiles | [GBIF Maps API v2](https://techdocs.gbif.org/en/openapi/v2/maps) `adhoc` hexagon density tiles (EPSG:3857) | GBIF terms of use |
+| Taxonomy | [GBIF Backbone Taxonomy](https://doi.org/10.15468/39omei) | CC BY 4.0 |
+| Data standard | [Darwin Core](https://dwc.tdwg.org) terms (`basisOfRecord`, `occurrenceStatus`, `coordinateUncertaintyInMeters`, …) | TDWG standard |
+| Output format | [GeoJSON (RFC 7946)](https://www.rfc-editor.org/rfc/rfc7946) point layer | IETF |
+| Codes | ISO 3166-1 alpha-2 country codes; IUCN Red List categories and colours | ISO, IUCN |
+| Icons | [Material Symbols](https://fonts.google.com/icons), SVG paths inlined | Apache-2.0 |
+| Build | [esbuild](https://esbuild.github.io) whitespace minify for the release zip; no bundler for development | MIT |
+| Distribution | GitHub Releases (zip + SHA-256), [GeoLibre plugin registry](https://plugins.geolibre.app) | — |
+| Docs | Markdown, [shields.io](https://shields.io) badges | — |
 
 ## Data use and citation
 
@@ -343,6 +376,45 @@ means agreeing to the
 **Copy citation** puts a ready-made text on the clipboard: the access date, the
 exact API query, and the list of source datasets with their record counts.
 
+## References
+
+Journal articles and standards behind the plugin's design and its advice on
+data quality and citation:
+
+1. Wieczorek, J., Bloom, D., Guralnick, R., Blum, S., Döring, M., Giovanni, R.,
+   Robertson, T., & Vieglais, D. (2012). Darwin Core: an evolving
+   community-developed biodiversity data standard. *PLoS ONE*, 7(1), e29715.
+   <https://doi.org/10.1371/journal.pone.0029715>
+2. Robertson, T., Döring, M., Guralnick, R., Bloom, D., Wieczorek, J.,
+   Braak, K., Otegui, J., Russell, L., & Desmet, P. (2014). The GBIF Integrated
+   Publishing Toolkit: facilitating the efficient publishing of biodiversity
+   data on the internet. *PLoS ONE*, 9(8), e102623.
+   <https://doi.org/10.1371/journal.pone.0102623>
+3. Meyer, C., Kreft, H., Guralnick, R., & Jetz, W. (2015). Global priorities for
+   an effective information basis of biodiversity distributions. *Nature
+   Communications*, 6, 8221. <https://doi.org/10.1038/ncomms9221>
+4. Ball-Damerow, J. E., Brenskelle, L., Barve, N., Soltis, P. S., Sierwald, P.,
+   Bieler, R., LaFrance, R., Ariño, A. H., & Guralnick, R. P. (2019). Research
+   applications of primary biodiversity databases in the digital age. *PLoS
+   ONE*, 14(9), e0215794. <https://doi.org/10.1371/journal.pone.0215794>
+5. Zizka, A., Silvestro, D., Andermann, T., Azevedo, J., Duarte Ritter, C.,
+   Edler, D., Farooq, H., Herdean, A., Ariza, M., Scharn, R., Svantesson, S.,
+   Wengström, N., Zizka, V., & Antonelli, A. (2019). CoordinateCleaner:
+   standardized cleaning of occurrence records from biological collection
+   databases. *Methods in Ecology and Evolution*, 10(5), 744–751.
+   <https://doi.org/10.1111/2041-210X.13152>
+6. Heberling, J. M., Miller, J. T., Noesgaard, D., Weingart, S. B., & Schigel, D.
+   (2021). Data integration enables global biodiversity synthesis.
+   *Proceedings of the National Academy of Sciences*, 118(6), e2018093118.
+   <https://doi.org/10.1073/pnas.2018093118>
+7. Chapman, A. D. (2005). *Principles of Data Quality*. Copenhagen: Global
+   Biodiversity Information Facility.
+8. IUCN (2012). *IUCN Red List Categories and Criteria: Version 3.1* (2nd ed.).
+   Gland and Cambridge: IUCN.
+   <https://www.iucnredlist.org/resources/categories-and-criteria>
+9. GBIF Secretariat (2023). *GBIF Backbone Taxonomy*. Checklist dataset.
+   <https://doi.org/10.15468/39omei>
+
 ## Privacy
 
 The plugin sends only your filter parameters (area bounds, taxon keys, years,
@@ -351,6 +423,16 @@ servers when a popup opens. It stores nothing and needs no account or key.
 Links to `www.gbif.org` open only when you click them.
 
 ## Changelog
+
+### 1.1.1
+
+- Screenshots for the GeoLibre plugin catalog, shipped in the release zip
+  (`screenshots/`), and listed in the registry entry.
+- `LICENSE-Apache-2.0.txt` and `THIRD_PARTY_NOTICES.md` in the plugin folder and
+  the release zip, for the Apache-2.0 Material Symbols icons inlined in
+  `index.js` (Apache-2.0 asks redistributors to include its text). The plugin
+  code stays MIT.
+- README: tech stack and journal references.
 
 ### 1.1.0
 
@@ -377,6 +459,8 @@ guidelines:
 ## Licence
 
 The plugin code is [MIT](LICENSE), © 2026 Defani Arman Alfitriansyah. Icons
-from Google's Material Symbols (Apache-2.0). The MIT licence covers the code
+from Google's Material Symbols (Apache-2.0; full text in
+[`geolibre-gbif-data/LICENSE-Apache-2.0.txt`](geolibre-gbif-data/LICENSE-Apache-2.0.txt),
+see [`THIRD_PARTY_NOTICES.md`](geolibre-gbif-data/THIRD_PARTY_NOTICES.md)). The MIT licence covers the code
 only, not the GBIF data it fetches, which keep their publishers' licences (see
 [Data use and citation](#data-use-and-citation)).
