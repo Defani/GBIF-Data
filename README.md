@@ -2,6 +2,7 @@
 
 ![version](https://img.shields.io/badge/version-1.1.0-2e7d32)
 ![GeoLibre](https://img.shields.io/badge/GeoLibre-%E2%89%A5%203.0.0-2e7d32)
+![renderer](https://img.shields.io/badge/renderer-MapLibre-396cb2)
 ![MapLibre](https://img.shields.io/badge/MapLibre-GL-3D7E9A?logo=maplibre&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-F7DF1E?logo=javascript&logoColor=black)
 ![ES Modules](https://img.shields.io/badge/ES-Modules-000000?logo=javascript&logoColor=white)
@@ -11,7 +12,7 @@
 
 Fetch georeferenced occurrence records from the
 [Global Biodiversity Information Facility](https://www.gbif.org) straight onto
-the GeoLibre map.
+the GeoLibre map. 
 
 > **Independent project.** This is a community plugin, made out of
 > appreciation for GBIF's open data. It is **not** made, affiliated with,
@@ -19,6 +20,17 @@ the GeoLibre map.
 > uses no GBIF logo. The data belong to their publishers and come with no
 > guarantee of quality or completeness — see the
 > [GBIF data user agreement](https://www.gbif.org/terms/data-user).
+
+> **Ringkasan (Bahasa Indonesia)** — Plugin GeoLibre untuk mengambil data
+> kemunculan (occurrence) spesies dari GBIF langsung ke peta. Filter
+> berdasarkan area (tampilan peta, extent layer, negara, atau seluruh dunia),
+> takson, jenis rekaman, tahun, kualitas data, kategori IUCN, dan lainnya.
+> Hasil bisa ditambahkan sebagai titik (GeoJSON, maks. 5.000 rekaman), sebagai
+> layer kepadatan heksagon GBIF, atau keduanya. Klik titik untuk melihat
+> detail dan foto rekaman. Plugin ini dibuat secara independen sebagai bentuk
+> apresiasi, **bukan** produk resmi GBIF. Kartu "Cite this data" membantu
+> mengutip data sesuai pedoman GBIF (daftar dataset untuk DOI *derived
+> dataset*).
 
 ## Screenshots
 
