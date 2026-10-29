@@ -34,7 +34,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const PLUGIN_ID = "geolibre-gbif-data";
-const PLUGIN_VERSION = "1.1.0";
+const PLUGIN_VERSION = "1.1.1";
 const PANEL_ID = `${PLUGIN_ID}-panel`;
 const PLUGIN_TITLE = "GBIF Data";
 
